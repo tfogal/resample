@@ -115,3 +115,31 @@ func TestTrilinear1pt5x(t *testing.T) {
 		t.Fatalf("null interp: %v", err)
 	}
 }
+
+// Identity: "resample" to the same space
+func TestTrilinearPlaneIdentity(t *testing.T) {
+	dims := [3]uint{4,4,4}
+	in := make([]float32, dims[0]*dims[1]*dims[2])
+	out := make([]float32, dims[0]*dims[1]*dims[2])
+
+	trilinear_planef(in,dims, out,dims)
+	err := validate(dims, func(x,y,z uint) bool {
+		linear := z*dims[1]*dims[0] + y*dims[0] + x
+		return in[linear] == out[linear]
+	})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	analytic(in, dims, xinc)
+	if err := trilinearf(in,dims, out,dims) ; err != nil {
+		t.Fatalf("trilinear failed: %v", err)
+	}
+	err = validate(dims, func(x,y,z uint) bool {
+		linear := z*dims[1]*dims[0] + y*dims[0] + x
+		return in[linear] == out[linear]
+	})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+}

@@ -143,3 +143,96 @@ func TestTrilinearPlaneIdentity(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+// Uses both mechanisms to interpolate the sphere function, and then compares
+// the results to make sure it's the same both ways.
+func TestSphereTwo(t *testing.T) {
+	idims := [3]uint{8,8,8}
+	odims := [3]uint{12,12,12}
+	in := make([]float32, idims[0]*idims[1]*idims[2])
+	out := make([]float32, odims[0]*odims[1]*odims[2])
+
+	analytic(in, idims, sphere)
+	if err := trilinearf(in,idims, out,odims); err != nil {
+		t.Fatalf("null interp: %v", err)
+	}
+
+	planeout := make([]float32, odims[0]*odims[1]*odims[2])
+	trilinear_planef(in,idims, planeout,odims)
+	err := validate(odims, func(x,y,z uint) bool {
+		linear := z*odims[1]*odims[0] + y*odims[0] + x
+		return out[linear] == planeout[linear]
+	})
+	if err != nil {
+		t.Fatalf("serial vs threaded impls differ: %v", err)
+	}
+}
+
+// Odd dimensions for the output side.
+func TestSphereOddOut(t *testing.T) {
+	idims := [3]uint{8,8,8}
+	odims := [3]uint{13,13,13}
+	in := make([]float32, idims[0]*idims[1]*idims[2])
+	out := make([]float32, odims[0]*odims[1]*odims[2])
+
+	analytic(in, idims, sphere)
+	if err := trilinearf(in,idims, out,odims); err != nil {
+		t.Fatalf("null interp: %v", err)
+	}
+
+	planeout := make([]float32, odims[0]*odims[1]*odims[2])
+	trilinear_planef(in,idims, planeout,odims)
+	err := validate(odims, func(x,y,z uint) bool {
+		linear := z*odims[1]*odims[0] + y*odims[0] + x
+		return out[linear] == planeout[linear]
+	})
+	if err != nil {
+		t.Fatalf("serial vs threaded impls differ: %v", err)
+	}
+}
+
+// Odd dimensions on the input side
+func TestSphereOddInput(t *testing.T) {
+	idims := [3]uint{7,7,7}
+	odims := [3]uint{12,12,12}
+	in := make([]float32, idims[0]*idims[1]*idims[2])
+	out := make([]float32, odims[0]*odims[1]*odims[2])
+
+	analytic(in, idims, sphere)
+	if err := trilinearf(in,idims, out,odims); err != nil {
+		t.Fatalf("null interp: %v", err)
+	}
+
+	planeout := make([]float32, odims[0]*odims[1]*odims[2])
+	trilinear_planef(in,idims, planeout,odims)
+	err := validate(odims, func(x,y,z uint) bool {
+		linear := z*odims[1]*odims[0] + y*odims[0] + x
+		return out[linear] == planeout[linear]
+	})
+	if err != nil {
+		t.Fatalf("serial vs threaded impls differ: %v", err)
+	}
+}
+
+// Odd dimensions on both input and output
+func TestSphereOddInputOutput(t *testing.T) {
+	idims := [3]uint{7,7,7}
+	odims := [3]uint{17,17,17}
+	in := make([]float32, idims[0]*idims[1]*idims[2])
+	out := make([]float32, odims[0]*odims[1]*odims[2])
+
+	analytic(in, idims, sphere)
+	if err := trilinearf(in,idims, out,odims); err != nil {
+		t.Fatalf("null interp: %v", err)
+	}
+
+	planeout := make([]float32, odims[0]*odims[1]*odims[2])
+	trilinear_planef(in,idims, planeout,odims)
+	err := validate(odims, func(x,y,z uint) bool {
+		linear := z*odims[1]*odims[0] + y*odims[0] + x
+		return out[linear] == planeout[linear]
+	})
+	if err != nil {
+		t.Fatalf("serial vs threaded impls differ: %v", err)
+	}
+}

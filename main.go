@@ -201,18 +201,30 @@ func trilinear_planef(in []float32, id [3]uint, out []float32, od [3]uint) {
 	output := make(chan *scanline)
 	var wg sync.WaitGroup
 
+	ratio := float32(id[2]) / float32(od[2])
 	wg.Add(int(od[2]))
 	for z:=uint(0); z < od[2]; z++ {  // each iter starts a producer.
-		if z == od[2]-1 {
-			// hack: copy the last 2 planes twice just to satisfy arguments.  The
-			// math works out such that "t" will always be 0.0, so only the first
-			// plane will be read, but copy it to both planes just to be sure.
+		mid := float32(z) * ratio
+		lower := uint(mid)
+		if lower == id[2]-1 {
+			// hack: copy the last 2 planes twice.  This situation occurs when we
+			// have so many more planes in the output dataset that we are creating
+			// "N" planes for every plane in the input dataset.  If that's the case
+			// then the *last* plane will be duplicated N times, too, but there isn't
+			// a plane on the "upper" (lower+1) side to source the data from.
+			// We duplicate the input's final plane as the plane on both sides.  When
+			// the interpolation happens, the 't' will be irrelevant since both sides
+			// are the same.
 			blah := make([]float32, 2*id[1]*id[0])
-			copy(blah, in[z*id[1]*id[0]:])
-			copy(blah[id[1]*id[0]:], in[z*id[1]*id[0]:])
+			copy(blah, in[lower*id[1]*id[0]:])
+			copy(blah[id[1]*id[0]:], in[lower*id[1]*id[0]:])
 			go planef(blah, id, z, output, od, &wg)
 		} else {
-			go planef(in[z*od[1]*od[0]:], id, z, output, od, &wg)
+/*
+			fmt.Printf("len(in)=%d, z=%d, lower=%d, id={%d,%d,%d}\n", len(in), z,
+			           lower, id[0],id[1],id[2])
+*/
+			go planef(in[lower*id[1]*id[0]:], id, z, output, od, &wg)
 		}
 	}
 	done := make(chan int)

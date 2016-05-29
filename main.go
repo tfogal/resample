@@ -133,6 +133,9 @@ func planef(in []float32,id [3]uint, zoff uint, out chan *scanline, od [3]uint,
 	if od[0] <= 1 || od[1] <= 1 || id[2] <= 1 {
 		panic("ill-defined results for small output volumes")
 	}
+	if uint(len(in)) < id[1]*id[0]*2 {
+		panic("input length too small")
+	}
 	ratio := [3]float32{float32(id[0]) / float32(od[0]),
 	                    float32(id[1]) / float32(od[1]),
 	                    float32(id[2]) / float32(od[2])}
@@ -154,7 +157,7 @@ func planef(in []float32,id [3]uint, zoff uint, out chan *scanline, od [3]uint,
 	// We send a scanline-at-a-time to the channel.  Though a single value would
 	// work fine, no consumer would want so little data at a time.
 	sline := make([]float32, od[0])
-	// Now 2D iterate: our actual work is the entire plane for z=zoff
+	// Now 2D iterate: our work is the entire plane for z=zoff
 	for y:=uint(0); y < od[1]; y++ {
 		mid[1] = float32(y) * ratio[1]
 		lower[1] = uint(mid[1])

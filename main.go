@@ -3,6 +3,7 @@ package main
 import(
 	"errors"
 	"fmt"
+	"sync"
 )
 
 /*
@@ -114,11 +115,18 @@ func trilinearf(in []float32,id [3]uint, out []float32, od [3]uint) error {
 	return nil
 }
 
+type scanline struct {
+	s uint
+	data []float32
+}
+
 // trilinear interpolation using 2 planes of data.
 // The input is 2 planes of what is expected to be a larger dataset.
 // ZOFF describes where the lower of those 2 planes begins within the large
 // dataset.
-func planef(in []float32,id [3]uint, zoff uint, out chan []float32, od [3]uint) {
+func planef(in []float32,id [3]uint, zoff uint, out chan *scanline, od [3]uint,
+            wg *sync.WaitGroup) {
+	defer wg.Done()
 	if id[0] <= 1 || id[1] <= 1 || id[2] <= 1 {
 		panic("ill-defined results for small input volumes")
 	}
@@ -145,7 +153,7 @@ func planef(in []float32,id [3]uint, zoff uint, out chan []float32, od [3]uint) 
 
 	// We send a scanline-at-a-time to the channel.  Though a single value would
 	// work fine, no consumer would want so little data at a time.
-	scanline := make([]float32, od[0])
+	sline := make([]float32, od[0])
 	// Now 2D iterate: our actual work is the entire plane for z=zoff
 	for y:=uint(0); y < od[1]; y++ {
 		mid[1] = float32(y) * ratio[1]
@@ -178,38 +186,48 @@ func planef(in []float32,id [3]uint, zoff uint, out chan []float32, od [3]uint) 
 			back := lerpf(bk_lowx,bk_highx, t[1])
 			final := lerpf(front,back, t[2])
 
-			scanline[x] = final
+			sline[x] = final
 		}
-		out <- scanline
+		s := scanline { s:zoff*od[1]+y, data: make([]float32, od[0]) }
+		copy(s.data, sline)
+		out <- &s
 	}
 }
 
 func trilinear_planef(in []float32, id [3]uint, out []float32, od [3]uint) {
-	//output := make(chan []float32, 128)
-	output := make(chan []float32)
+	output := make(chan *scanline)
+	var wg sync.WaitGroup
 
-	for z:=uint(0); z < od[2]; z++ {
-		fmt.Printf("z=%d, slice [%d:]\n", z, z*od[1]*od[0])
+	wg.Add(int(od[2]))
+	for z:=uint(0); z < od[2]; z++ {  // each iter starts a producer.
 		if z == od[2]-1 {
-			// hack: copy the last 2 planes twice to make sure interpolation works
-			// out.
+			// hack: copy the last 2 planes twice just to satisfy arguments.  The
+			// math works out such that "t" will always be 0.0, so only the first
+			// plane will be read, but copy it to both planes just to be sure.
 			blah := make([]float32, 2*id[1]*id[0])
 			copy(blah, in[z*id[1]*id[0]:])
 			copy(blah[id[1]*id[0]:], in[z*id[1]*id[0]:])
-			go planef(blah, id, z, output, od)
+			go planef(blah, id, z, output, od, &wg)
 		} else {
-			go planef(in[z*od[1]*od[0]:], id, z, output, od)
+			go planef(in[z*od[1]*od[0]:], id, z, output, od, &wg)
 		}
 	}
-	for z:=uint(0); z < od[2]; z++ {
-		scanline := <-output
-		if uint(len(scanline)) != od[0] {
-			fmt.Printf("len(scanline)=%d, != %d\n", len(scanline), od[0])
-			panic("scanline length broken")
+	done := make(chan int)
+	go func() { // consumer.
+		for sline := range output {
+			if uint(len(sline.data)) != od[0] {
+				fmt.Printf("len(scanline)=%d, != %d\n", len(sline.data), od[0])
+				panic("scanline length broken")
+			}
+			s := sline.s
+			copy(out[s*od[0]:(s+1)*od[0]], sline.data)
 		}
-		copy(out[z*od[0]:(z+1)*od[0]], scanline)
-	}
+		done <- 1
+	}()
+	wg.Wait()
 	close(output)
+	<-done
+	close(done)
 }
 
 func main() {

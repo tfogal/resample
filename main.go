@@ -1,7 +1,6 @@
 package main
 
 import(
-	"errors"
 	"fmt"
 	"sync"
 )
@@ -54,12 +53,12 @@ func max3u(l [3]uint, mx [3]uint) [3]uint {
 	return [3]uint{max(l[0], mx[0]), max(l[1], mx[1]), max(l[2], mx[2])}
 }
 
-func trilinearf(in []float32,id [3]uint, out []float32, od [3]uint) error {
+func trilinearf(in []float32,id [3]uint, out []float32, od [3]uint) {
 	if id[0] <= 1 || id[1] <= 1 || id[2] <= 1 {
-		return errors.New("ill-defined results for small input volumes")
+		panic("ill-defined results for small input volumes")
 	}
 	if od[0] <= 1 || od[1] <= 1 || id[2] <= 1 {
-		return errors.New("ill-defined results for small output volumes")
+		panic("ill-defined results for small output volumes")
 	}
 	ratio := [3]float32{float32(id[0]) / float32(od[0]),
 	                    float32(id[1]) / float32(od[1]),
@@ -112,7 +111,6 @@ func trilinearf(in []float32,id [3]uint, out []float32, od [3]uint) error {
 			}
 		}
 	}
-	return nil
 }
 
 type scanline struct {

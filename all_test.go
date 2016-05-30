@@ -51,9 +51,7 @@ func TestTrilinearIdentity(t *testing.T) {
 	in := make([]float32, dims[0]*dims[1]*dims[2])
 	out := make([]float32, dims[0]*dims[1]*dims[2])
 
-	if err := trilinearf(in,dims, out,dims) ; err != nil {
-		t.Fatalf("trilinear failed: %v", err)
-	}
+	trilinearf(in,dims, out,dims)
 	err := validate(dims, func(x,y,z uint) bool {
 		linear := z*dims[1]*dims[0] + y*dims[0] + x
 		return in[linear] == out[linear]
@@ -63,9 +61,7 @@ func TestTrilinearIdentity(t *testing.T) {
 	}
 
 	analytic(in, dims, xinc)
-	if err := trilinearf(in,dims, out,dims) ; err != nil {
-		t.Fatalf("trilinear failed: %v", err)
-	}
+	trilinearf(in,dims, out,dims)
 	err = validate(dims, func(x,y,z uint) bool {
 		linear := z*dims[1]*dims[0] + y*dims[0] + x
 		return in[linear] == out[linear]
@@ -81,14 +77,10 @@ func TestTrilinear2x(t *testing.T) {
 	in := make([]float32, idims[0]*idims[1]*idims[2])
 	out := make([]float32, odims[0]*odims[1]*odims[2])
 
-	if err := trilinearf(in,idims, out,odims); err != nil {
-		t.Fatalf("null interp: %v", err)
-	}
+	trilinearf(in,idims, out,odims)
 
 	analytic(in, idims, sphere)
-	if err := trilinearf(in,idims, out,odims); err != nil {
-		t.Fatalf("null interp: %v", err)
-	}
+	trilinearf(in,idims, out,odims)
 	err := validate(odims, func(x,y,z uint) bool {
 		sum := float64(x*x + y*y + z*z)
 		if math.Sqrt(sum) < 4.0 {
@@ -111,9 +103,7 @@ func TestTrilinear1pt5x(t *testing.T) {
 	out := make([]float32, odims[0]*odims[1]*odims[2])
 
 	analytic(in, idims, sphere)
-	if err := trilinearf(in,idims, out,odims); err != nil {
-		t.Fatalf("null interp: %v", err)
-	}
+	trilinearf(in,idims, out,odims)
 }
 
 // Identity: "resample" to the same space
@@ -132,9 +122,7 @@ func TestTrilinearPlaneIdentity(t *testing.T) {
 	}
 
 	analytic(in, dims, xinc)
-	if err := trilinearf(in,dims, out,dims) ; err != nil {
-		t.Fatalf("trilinear failed: %v", err)
-	}
+	trilinearf(in,dims, out,dims)
 	err = validate(dims, func(x,y,z uint) bool {
 		linear := z*dims[1]*dims[0] + y*dims[0] + x
 		return in[linear] == out[linear]
@@ -153,9 +141,7 @@ func TestSphereTwo(t *testing.T) {
 	out := make([]float32, odims[0]*odims[1]*odims[2])
 
 	analytic(in, idims, sphere)
-	if err := trilinearf(in,idims, out,odims); err != nil {
-		t.Fatalf("null interp: %v", err)
-	}
+	trilinearf(in,idims, out,odims)
 
 	planeout := make([]float32, odims[0]*odims[1]*odims[2])
 	trilinear_planef(in,idims, planeout,odims)
@@ -176,9 +162,7 @@ func TestSphereOddOut(t *testing.T) {
 	out := make([]float32, odims[0]*odims[1]*odims[2])
 
 	analytic(in, idims, sphere)
-	if err := trilinearf(in,idims, out,odims); err != nil {
-		t.Fatalf("null interp: %v", err)
-	}
+	trilinearf(in,idims, out,odims)
 
 	planeout := make([]float32, odims[0]*odims[1]*odims[2])
 	trilinear_planef(in,idims, planeout,odims)
@@ -199,9 +183,7 @@ func TestSphereOddInput(t *testing.T) {
 	out := make([]float32, odims[0]*odims[1]*odims[2])
 
 	analytic(in, idims, sphere)
-	if err := trilinearf(in,idims, out,odims); err != nil {
-		t.Fatalf("null interp: %v", err)
-	}
+	trilinearf(in,idims, out,odims)
 
 	planeout := make([]float32, odims[0]*odims[1]*odims[2])
 	trilinear_planef(in,idims, planeout,odims)
@@ -222,9 +204,7 @@ func TestSphereOddInputOutput(t *testing.T) {
 	out := make([]float32, odims[0]*odims[1]*odims[2])
 
 	analytic(in, idims, sphere)
-	if err := trilinearf(in,idims, out,odims); err != nil {
-		t.Fatalf("null interp: %v", err)
-	}
+	trilinearf(in,idims, out,odims)
 
 	planeout := make([]float32, odims[0]*odims[1]*odims[2])
 	trilinear_planef(in,idims, planeout,odims)

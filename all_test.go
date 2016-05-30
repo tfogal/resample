@@ -216,3 +216,23 @@ func TestSphereOddInputOutput(t *testing.T) {
 		t.Fatalf("serial vs threaded impls differ: %v", err)
 	}
 }
+
+func TestAnisotropic(t *testing.T) {
+	id := [3]uint{5, 8, 14}
+	od := [3]uint{9, 14, 22}
+	in := make([]float32, id[0]*id[1]*id[2])
+	out := make([]float32, od[0]*od[1]*od[2])
+	outplane := make([]float32, od[0]*od[1]*od[2])
+
+	analytic(in, id, sphere)
+	trilinearf(in, id, out, od)
+
+	trilinear_planef(in,id, outplane,od)
+	err := validate(od, func(x,y,z uint) bool {
+		linear := z*od[1]*od[0] + y*od[0] + x
+		return out[linear] == outplane[linear]
+	})
+	if err != nil {
+		t.Fatalf("anisotropic serial vs threaded impls differ: %v", err)
+	}
+}

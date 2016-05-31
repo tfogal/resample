@@ -6,29 +6,9 @@ import(
 	"testing"
 )
 
-type valuefqn func(x,y,z uint) float32
 func xinc(x,y,z uint) float32 { return float32(x) }
 func yinc(x,y,z uint) float32 { return float32(y) }
 func zinc(x,y,z uint) float32 { return float32(z) }
-func sphere(x,y,z uint) float32 {
-	sum := float64(x*x + y*y + z*z)
-	if math.Sqrt(sum) < 4.0 {
-		return lerpf(0.0, 10.0, float32(math.Sqrt(sum)/4.0))
-	}
-	return 0.0
-}
-
-// define the volume according to the given function
-func analytic(data []float32, dims [3]uint, value valuefqn) {
-	for z:=uint(0); z < dims[2]; z++ {
-		for y:=uint(0); y < dims[1]; y++ {
-			for x:=uint(0); x < dims[0]; x++ {
-				linear := z*dims[1]*dims[0] + y*dims[0] + x
-				data[linear] = value(x,y,z)
-			}
-		}
-	}
-}
 
 // evaluate the valfqn at each grid point; bail if it fails ever.
 type valfqn func(x,y,z uint) bool

@@ -1,16 +1,49 @@
 package main
 
 import(
+	"errors"
+	"flag"
 	"fmt"
+	"math"
+	"os"
+	"reflect"
 	"sync"
+	"unsafe"
 )
 
-/*
-[0,10) -> [0,100): 10/100 = .1/1
-[0,496] -> [0,500): 496/500 = .992
-*/
-var id[3] uint
-var od[3] uint
+var idims [3]uint // input dimensions
+var odims [3]uint // output dimensions
+var mksphere = false
+var input string
+var output string
+
+func init() {
+	flag.BoolVar(&mksphere, "sphere", false, "create 'sphere' output file")
+	flag.UintVar(&idims[0], "ix", 0, "dimensions of the input file, X")
+	flag.UintVar(&idims[1], "iy", 0, "dimensions of the input file, Y")
+	flag.UintVar(&idims[2], "iz", 0, "dimensions of the input file, Z")
+	flag.UintVar(&odims[0], "ox", 0, "dimensions of the output file, X")
+	flag.UintVar(&odims[1], "oy", 0, "dimensions of the output file, Y")
+	flag.UintVar(&odims[2], "oz", 0, "dimensions of the output file, Z")
+	flag.StringVar(&input, "input", "", "file to read from")
+	flag.StringVar(&output, "output", "", "file to create")
+}
+
+func validate_args() error {
+	if odims[0]*odims[1]*odims[2] == 0 {
+		return errors.New("output volume size is 0.")
+	}
+	if output == "" {
+		return errors.New("output filename not given")
+	}
+	if !mksphere && idims[0]*idims[1]*idims[2] == 0 {
+		return errors.New("input volume size is 0.")
+	}
+	if !mksphere && input == "" {
+		return errors.New("input filename not given")
+	}
+	return nil
+}
 
 func sample(in []float32,d [3]uint, l [8][3]uint, into *[8]float32) {
 	for i:=0; i < 8; i++ {
@@ -249,6 +282,139 @@ func trilinear_planef(in []float32, id [3]uint, out []float32, od [3]uint) {
 	close(done)
 }
 
+type valuefqn func(x,y,z uint) float32
+// define the volume according to the given function
+func analytic(data []float32, dims [3]uint, value valuefqn) {
+	for z:=uint(0); z < dims[2]; z++ {
+		for y:=uint(0); y < dims[1]; y++ {
+			for x:=uint(0); x < dims[0]; x++ {
+				linear := z*dims[1]*dims[0] + y*dims[0] + x
+				data[linear] = value(x,y,z)
+			}
+		}
+	}
+}
+func sqrtf(a float32) float32 { // go doesn't provide a sqrt for float32.
+	return float32(math.Sqrt(float64(a)))
+}
+func dist(a,b,c float32, x,y,z float32) float32 {
+	return sqrtf((a-x)*(a-x) + (b-y)*(b-y) + (c-z)*(c-z))
+}
+func sphere(x,y,z uint) float32 {
+	d := dist(float32(x),float32(y),float32(z), 32,32,32)
+	if d < 8.0 {
+		return lerpf(0.0, 10.0, d / 8.0)
+		//return lerpf(0.0, 10.0, float32(math.Sqrt(sum)/4.0))
+	}
+	return 0.0
+}
+
+func castfb(data []float32) []byte {
+	var f32 float32 // needed because unsafe.Sizeof takes an expr, not a type.
+	hdr := *(*reflect.SliceHeader)(unsafe.Pointer(&data))
+	hdr.Len = int(unsafe.Sizeof(f32))*len(data)
+	hdr.Cap = int(unsafe.Sizeof(f32))*len(data)
+	asbytes := *(*[]byte)(unsafe.Pointer(&hdr))
+	return asbytes
+}
+func castbf(data []byte) []float32 {
+	var f32 float32 // needed because unsafe.Sizeof takes an expr, not a type.
+	hdr := *(*reflect.SliceHeader)(unsafe.Pointer(&data))
+	hdr.Len = len(data) / int(unsafe.Sizeof(f32))
+	hdr.Cap = len(data) / int(unsafe.Sizeof(f32))
+	asfloats := *(*[]float32)(unsafe.Pointer(&hdr))
+	return asfloats
+}
+
+func create_sphere(fname string, dims [3]uint) error {
+	data := make([]float32, dims[0]*dims[1]*dims[2])
+	analytic(data, dims, sphere)
+
+	f, err := os.OpenFile(fname, os.O_CREATE | os.O_TRUNC | os.O_WRONLY, 0666)
+	if err != nil {
+		return fmt.Errorf("cannot create %s: %v\n", fname, err)
+	}
+
+	asbytes := castfb(data)
+	bytes, err := f.Write(asbytes)
+	if err != nil || uint(bytes) != dims[0]*dims[1]*dims[2]*4 {
+		f.Close()
+		os.Remove(fname)
+		return fmt.Errorf("error writing %s: %v\n", fname, err)
+	}
+
+	if err := f.Close() ; err != nil {
+		os.Remove(fname)
+		return fmt.Errorf("error closing %s: %v\n", fname, err)
+	}
+	return nil
+}
+
+func read_rawf(fname string, dims [3]uint) ([]float32, error) {
+	f, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var float float32
+	sz := dims[0]*dims[1]*dims[2]*uint(unsafe.Sizeof(float))
+	data := make([]byte, sz)
+	i := 0
+	for uint(i) < sz {
+		bytes, err := f.Read(data[i:])
+		if err != nil {
+			return nil, err
+		}
+		i += bytes
+	}
+
+	return castbf(data), nil
+}
+
+func write_rawf(fname string, data []float32, dims [3]uint) error {
+	f, err := os.OpenFile(fname, os.O_CREATE | os.O_TRUNC | os.O_WRONLY, 0666)
+	if err != nil {
+		return err
+	}
+
+	var float float32
+	sz := dims[0]*dims[1]*dims[2]*uint(unsafe.Sizeof(float))
+	asbytes := castfb(data)
+	i := 0
+	for uint(i) < sz {
+		bytes, err := f.Write(asbytes)
+		if err != nil {
+			f.Close()
+			os.Remove(fname)
+			return fmt.Errorf("error writing %s: %v", fname, err)
+		}
+		i += bytes
+	}
+
+	if err := f.Close() ; err != nil {
+		os.Remove(fname)
+		return fmt.Errorf("error closing %s: %v", fname, err)
+	}
+	return nil
+}
+
 func main() {
-	fmt.Println("hi")
+	flag.Parse()
+	if err := validate_args() ; err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return
+	}
+
+	in, err := read_rawf(input, idims)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "reading data: %v\n", err)
+		return
+	}
+	out := make([]float32, odims[0]*odims[1]*odims[2])
+
+	trilinearf(in, idims, out, odims)
+	if err := write_rawf(output, out, odims) ; err != nil {
+		fmt.Fprintf(os.Stderr, "writing data: %v\n", err)
+	}
 }
